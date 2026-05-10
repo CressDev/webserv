@@ -12,3 +12,30 @@ Al cambiar cosas relacionadas con el cgi:
 2. Prueba a borrar esa foto desde la parte de delete de la web (No  debe fallar)
 3. Prueba a ir a la direccion 127.0.0.1:9999/cgi-bin/test.py (No debe fallar)
 4. Intenta ejecutar el test ./tests/cgi_post_tests.sh (A veces falla, no te preocupes)
+
+
+Comandos pruebasvc
+
+En otra terminal (deja el servidor corriendo en la primera), prueba un GET:
+curl -v http://127.0.0.1:9999/
+curl -v http://127.0.0.1:9998/
+curl -v http://127.0.0.1:8080/
+
+Probar un CGI :
+curl -v http://127.0.0.1:9999/cgi-bin/test.py
+
+Probar POST (ejemplo sencillo):
+curl -v -X POST http://127.0.0.1:9999/upload -d 'hola=123'
+
+Probar DELETE (tu location “delete-outside”):
+curl -v -X DELETE http://127.0.0.1:9999/delete-outside
+
+
+Pruebas del repo (automáticas)
+bash tests/post_tests.sh
+bash tests/chunked_test.sh
+bash tests/cgi_post_tests.sh
+bash tests/stress_concurrency.sh
+
+comprobar pid puerto en ejecución
+sudo lsof -i :9999
