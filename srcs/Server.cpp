@@ -14,7 +14,9 @@ Server::Server() : _fd(-1)
 	_config.client_max_body_size = 1048576;
 }
 
-Server::~Server(){}
+Server::~Server()
+{
+}
 
 void	Server::addListen(std::string& ip, std::string& port)
 {

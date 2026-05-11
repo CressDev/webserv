@@ -4,10 +4,24 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++98 #-fsanitize="address,leak" -fno-omit
 
 INC			= inc/
 SRCS_DIR	= srcs/
-    CFILES			= main/main.cpp \
-		 	ServerSocket.cpp \
-			utils.cpp Parser.cpp Server.cpp Client.cpp \
-			main/print_helpers.cpp main/signals.cpp main/cgi_fds.cpp main/event_loop.cpp
+CFILES		= ServerSocket.cpp \
+			utils.cpp \
+			Server.cpp \
+			client/Client.cpp \
+			client/client_parsing.cpp \
+			client/client_path.cpp \
+			client/client_cgi.cpp \
+			client/client_response.cpp \
+			client/client_helpers.cpp \
+			parse/Parser.cpp \
+			parse/parser_states.cpp \
+			parse/parser_validators.cpp \
+			parse/parser_parsers.cpp \
+			main/main.cpp \
+			main/print_helpers.cpp \
+			main/signals.cpp \
+			main/cgi_fds.cpp \
+			main/event_loop.cpp
 
 
 ODIR = build

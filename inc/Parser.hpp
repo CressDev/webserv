@@ -41,6 +41,10 @@ const std::string   cgikeys[4] =
 	".bla"
 };
 
+// Declaraciones de funciones de estado usadas por el parser (implementadas en srcs/parse/parser_states.cpp)
+int getState(int prev, int pos);
+int isConfigWord(std::string& token);
+
 enum    State
 {
     S_INI,

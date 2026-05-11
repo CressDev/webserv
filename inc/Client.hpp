@@ -299,6 +299,7 @@ public:
 };
 
 /*Demasiadas responsabilidades en Client
-Client parsea HTTP, gestiona CGI, sirve ficheros, genera directory listing, maneja errores y envía respuestas. Para 42 es habitual, pero si hay bugs es difícil aislarlos. Mencionarlo para la evaluación.
+Client parsea HTTP, gestiona CGI, sirve ficheros, genera directory listing, maneja errores y envía respuestas.
+Para 42 es habitual, pero si hay bugs es difícil aislarlos. Mencionarlo para la evaluación.
 Pasa el siguiente método cuando quieras.*/
 #endif

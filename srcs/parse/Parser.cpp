@@ -1,460 +1,62 @@
 #include "Parser.hpp"
-#include <stdexcept>
 
-int getState(int prev, int pos)
+int	Parser::getTypeOfItem(std::string& str)
 {
-    static int tokens[][11] = {
-        {S_ERR, S_SER, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR}, //  0 INI
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR}, //  1 Error
-        {S_ERR, S_ERR, S_SOP, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR}, //  2 SERVER
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_LOC, S_ERR, S_ERR, S_ERR, S_KEY, S_ERR, S_ERR}, //  3 SERVER_OP
-        {S_ERR, S_SER, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR}, //  4 SERVER_CL
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_LUR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR}, //  5 LOCATION
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_LOP, S_ERR, S_ERR, S_ERR, S_ERR}, //  6 LOCATION_URI
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_LCL, S_KEY, S_ERR, S_ERR}, //  7 LOCATION_OP
-        {S_ERR, S_ERR, S_ERR, S_SCL, S_LOC, S_ERR, S_ERR, S_ERR, S_KEY, S_ERR, S_ERR}, //  8 LOCATION_CL
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_PAR, S_ERR}, //  9 KEYWORD
-        {S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_ERR, S_PAR, S_SEM}, // 10 PARAMETER
-        {S_ERR, S_ERR, S_ERR, S_SCL, S_LOC, S_ERR, S_ERR, S_LCL, S_KEY, S_ERR, S_ERR}, // 11 SEMICOLON
-    };
-    return tokens[prev][pos];
+	if (str.size() == 3
+		&& strIsDigit(str) 
+		&& (str[0] == '3'
+			|| str[0] == '4'
+			|| str[0] == '5'))
+		return 1;
+	if (str.size() == 4
+		&& str[0] == '='
+		&& strIsDigit(str.substr(1, 3))
+		&& (str[1] == '1'
+			|| str[1] == '2'
+			|| str[1] == '3'
+			|| str[1] == '4'
+			|| str[1] == '5'))
+	{
+		return 2;
+	}
+	return 3;
 }
 
-int    isConfigWord(std::string& token)
+int	Parser::getErrorPageParserState(int prev, int pos)
 {
-    for (size_t i = 0; i < 15; i++)
-    {
-        if (token == configkeys[i])
-            return 1;
-    }
-    return 0;
+	static int matrix[][4] = {
+		{EP_ERR, EP_COD, EP_ERR, EP_ERR}, // INI
+		{EP_ERR, EP_COD, EP_OVR, EP_URI}, // EP_COD
+		{EP_ERR, EP_ERR, EP_ERR, EP_URI}, // EP_OVR
+		{EP_ERR, EP_ERR, EP_ERR, EP_ERR}  // EP_URI
+	};
+	return matrix[prev][pos];
 }
 
-int     Parser::chooseState(std::vector<std::string>& tokens)
+void	Parser::errorpageParser(std::vector<std::string>::iterator& it, Server& server)
 {
-    int prev = 0;
-    int  is_serv = 0   ;
-    int  is_loc = 0;
-
-    for (size_t i = 0; i < tokens.size(); i++)
-    {
-        int pos = 0;
-        if (tokens[i] == "server")
-            pos = 1;
-        else if (tokens[i] == "{" && prev == 2)
-        {
-            pos = 2;
-            is_serv = 1;
-        }
-        else if (tokens[i] == "{" && prev == 6)
-        {
-            pos = 6;
-            is_loc = 1;
-        }
-        else if (tokens[i] == "}")
-        {
-            if ((prev == 3 || prev == 8 || prev == 11) && is_serv)
-            {
-                pos = 3;
-                if (!is_loc)
-                    is_serv = 0;
-            }
-            if ((prev == 7 || prev == 11) && is_loc)
-            {
-                pos = 7;
-                is_loc = 0;
-            }
-        }
-        else if (tokens[i] == "location")
-            pos = 4;
-        else if (isConfigWord(tokens[i]))
-            pos = 8;
-        else if (tokens[i] == ";")
-            pos = 10;
-        else
-        {
-            pos = 9;
-            if (prev == 5)
-            {
-                if (tokens[i] == "=" && tokens[i + 1] != "{")
-                    i++;
-                else if (tokens[i] == "=" && tokens[i + 1] == "{")
-                {
-                    std::cerr << "Syntax error: " << tokens[i] << "\n";
-                    return 1;
-                }
-                pos = 5;
-            }
-        }
-        prev = getState(prev, pos);
-        if (prev == 1)
-        {
-            std::cerr << "Syntax error\n";
-            return 1;
-        }
-    }
-    return 0;
-}
-
-void    Parser::rmComments(std::ifstream& config_file)
-{
-    std::string line;
-
-    while (std::getline(config_file, line))
-    {
-        if (line.empty())
-            this->_config_file = this->_config_file + " ";
-        if (!line.empty())
-        {
-            size_t  pos = line.find('#');
-            if (pos != std::string::npos)
-                line = line.substr(0, pos);
-            std::string cleanLine = rtrim(line);
-            if (!cleanLine.empty())
-                this->_config_file += cleanLine + " ";
-        }
-    }
-}
-
-int     Parser::getIPV4State(int prev, int pos)
-{
-    static int tokens[][8] = {
-        {IP_ER, IP_00, IP_01, IP_02, IP_NU, IP_NU, IP_ER, IP_ER}, //  0 INI
-        {IP_ER, IP_ER, IP_ER, IP_ER, IP_ER, IP_ER, IP_PO, IP_ER}, // IP_00
-        {IP_ER, IP_01, IP_01, IP_01, IP_01, IP_01, IP_PO, IP_01}, // IP_01
-        {IP_ER, IP_01, IP_01, IP_01, IP_01, IP_05, IP_PO, IP_00}, // IP_02
-        {IP_ER, IP_ER, IP_ER, IP_ER, IP_ER, IP_ER, IP_ER, IP_ER}, // IP_03
-        {IP_ER, IP_00, IP_00, IP_00, IP_00, IP_00, IP_PO, IP_ER}, // IP_05
-        {IP_ER, IP_00, IP_01, IP_02, IP_NU, IP_NU, IP_ER, IP_NU}, // IP_PO
-        {IP_ER, IP_00, IP_00, IP_00, IP_00, IP_00, IP_PO, IP_00} // IP_NU
-        //{}, // IP_22
-    };
-    return tokens[prev][pos];
-}
-
-bool    Parser::check_ipv4(std::string t)
-{
-    int prev = 0;
-    int pos;
-    int len = 0;
-    size_t i = 0;
-
-    if (t == "localhost")
-        return (true);
-    for (; i < t.length(); i++)
-    {
-        pos = 0;
-        if (std::isdigit(t[i]) && t[i] == '0')
-        {
-            pos = 1;
-            len++;
-        }
-        else if (std::isdigit(t[i]) && t[i] == '1')
-        {
-            pos = 2;
-            len++;
-        }
-        else if (std::isdigit(t[i]) && t[i] == '2')
-        {
-            pos = 3;
-            len++;
-        }
-        else if (std::isdigit(t[i]) && ((t[i] == '3') || (t[i] == '4')))
-        {
-            pos = 4;
-            len++;
-        }
-        else if (std::isdigit(t[i]) && t[i] == '5')
-        {
-            pos = 5;
-            len++;
-        }
-        else if (t[i] == '.')
-        {
-            pos = 6;
-            len = 0;
-        }
-        else if (std::isdigit(t[i]) && t[i] > '5' && t[i] <= '9')
-        {
-            pos = 7;
-            len++;
-        }
-        prev = getIPV4State(prev, pos);
-        if (prev == 0 || len > 3)
-            return (false);
-    }
-    if (!std::isdigit(t[i - 1]))
-        return false;
-    return (true);
-}
-
-bool   Parser::check_port(std::string t)
-{
-    std::stringstream       parse;
-    long long               n;
-    std::string::iterator   it = t.begin();
-    std::string::iterator   end = t.end();
-    
-    while (it != end)
-    {
-        if (!std::isdigit(*it))
-            return false;
-        ++it;
-    }
-    parse << t;
-    parse >> n;
-    if (n > 65535 || n < 0)
-        return false;
-    return true;
-}
-
-void    Parser::listenParser(std::vector<std::string>::iterator& it, Server& server)
-{
-    if (*(it + 2) != ";")
-        throw std::runtime_error("Parser: configuration error");
-    ++it;
-    std::string t = *it;
-    size_t  pos = t.find(':');
-    if (pos != std::string::npos)
-    {
-        std::string ip = t.substr(0, pos);
-        std::string port = t.substr(pos + 1);
-            
-        if (ip.size() == 0 || port.size() == 0 || !check_ipv4(ip) || !check_port(port))
-        {
-            throw std::runtime_error("Parser: configuration error");
-        }
-        if (ip == "localhost")
-            ip = "127.0.0.1";
-        ++it;
-        _listens.insert(std::pair<std::string, std::string>(ip, port));
-		server.addListen(ip, port);
-    }
-    else
-    {    
-        bool    	ip = false;
-        bool    	port = false;
-		std::string	ipPort;
-            
-        ip = check_ipv4(t);
-        port = check_port(t);
-        if (ip)
-        {
-            if (t == "localhost")
-                t = "127.0.0.1";
-			ipPort = "80";
-			server.addListen(t, ipPort);
-            ++it;
-            return ;
-        }
-        if (port)
-        {
-			ipPort = "127.0.0.1";
-			server.addListen(ipPort, t);
-            ++it;
-            return ;
-        }
-        throw std::runtime_error("Parser: configuration error");
-    }
-}
-
-int     Parser::getClientMaxBodySizeState(int prev, int pos)
-{
-    static int tokens[][3] = {
-        {BD_ERR, BD_NUM, BD_ERR}, // 0 INI
-        {BD_ERR, BD_NUM, BD_CHR}, // 1 BD_NUM
-        {BD_ERR, BD_ERR, BD_ERR}  // 2 BD_CHR
-    };
-    return tokens[prev][pos];
-}
-
-
-bool    Parser::checkclientmaxbodysize(std::string t)
-{
-    int prev = 0;
-    int pos;
-    std::string::iterator   it = t.begin();
-    std::string::iterator   end = t.end();
-
-    for (; it != end; ++it)
-    {
-        pos = 0;
-        if (std::isdigit(*it))
-            pos = 1;
-        else if (*it == 'g' || *it == 'G' || *it == 'k' || *it == 'K' || *it == 'm' || *it == 'M')
-            pos = 2;
-        prev = getClientMaxBodySizeState(prev, pos);
-        if (prev == 0)
-            return false;
-    }
-    return true;
-}
-
-
-void    Parser::clientmaxbodysizeParser(std::vector<std::string>::iterator& it,Server& server)
-{
-    std::stringstream   parse;
-    long long           n;
-    char                c;
-
-    if (*(it + 2) != ";")
-        throw std::runtime_error("Parser: configuration error");
-    ++it;
-    if (checkclientmaxbodysize(*it) == false)
-        throw std::runtime_error("Parser: configuration error");
-    parse << *it;
-    parse >> n;
-    parse >> c;
-    if (n < 0 || static_cast<size_t>(n) > std::numeric_limits<size_t>::max())
-        throw std::runtime_error("Parser: configuration error");
-    server.setClientMaxBodySize(n, c);
-}
-
-void    Parser::autoindexParser(std::vector<std::string>::iterator& it, Server& server)
-{
-    if (*(it + 2) != ";")
-        throw std::runtime_error("Parser: configuration error");
-    ++it;
-    if (*it != "on" && *it != "off")
-        throw std::runtime_error("Parser: configuration error");
-    if (*it == "on")
-        server.setAutoindex(true);
-    else
-        server.setAutoindex(false);
-    ++it;
-}
-
-void	Parser::allowedParser(std::vector<std::string>::iterator& it, Server& server)
-{
-    std::vector<std::string>    methods;
+	int                                 pos;
+	int                                 prev = 0;
+	std::vector<std::pair<int, int> >   ovr;
 
 	++it;
 	while (*it != ";")
 	{
-		if (*it != "GET" && *it != "POST" && *it != "DELETE")
+		pos = getTypeOfItem(*it);
+		prev = getErrorPageParserState(prev, pos);
+		if (prev == 0)
 			throw std::runtime_error("Parser: configuration error");
-        else
-            methods.push_back(*it);
-		++it;
-	}
-    server.setAllowedMethods(methods);
-}
-
-int		Parser::getServerNameState(int prev, int pos)
-{
-	static int	matrix[][7] = {
-		{1, 1, 2, 2, 2, 2, 1},
-		{1, 1, 1, 1, 1, 1, 1}, //error
-		{1, 3, 2, 2, 2, 2, 1}, //cualquier caracter
-		{1, 1, 4, 2, 2, 2, 1}, //.
-		{1, 3, 2, 5, 2, 2, 1}, //c
-		{1, 3, 2, 2, 6, 2, 1}, //o
-		{1, 3, 2, 2, 2, 2, 1}, //m
-	};
-	return (matrix[prev][pos]);
-}
-
-void	Parser::serverNameParser(std::vector<std::string>::iterator& it,Server& server)
-{
-	std::string			str;
-	int					prev = 0;
-	int					pos;
-
-	it++;
-	while (*it != ";")
-	{
-		size_t		i = 0;
-		str = *it;
-		prev = 0;
-		if (!check_ipv4(str))
-		{
-			while (i < str.length())
-			{
-				pos = 0;
-				if (str[i] == '.')
-        	        pos = 1;
-				else if (str[i] == 'c')
-					pos = 2;
-				else if (str[i] == 'o')
-					pos = 3;
-				else if (str[i] == 'm')
-					pos = 4;
-				else if (std::isalpha(str[i]) && str[i] != '*')
-					pos = 5;
-				else
-					pos = 6;
-				prev = getServerNameState(prev, pos);
-				if (prev == 1)
-					throw std::runtime_error("Parser: configuration error");
-				i++;
-			}
-			if (prev != 6)
-			    throw std::runtime_error("Parser: configuration error");
-		}
-        else
-            throw std::runtime_error(std::string("Parser: unknown token inside location block: ") + *it);
-		++it;
-	}
-    server.setServerName(*(it - 1));
-}
-
-int     Parser::getTypeOfItem(std::string& str)
-{
-    if (str.size() == 3
-        && strIsDigit(str) 
-        && (str[0] == '3'
-            || str[0] == '4'
-            || str[0] == '5'))
-        return 1;
-    if (str.size() == 4
-        && str[0] == '='
-        && strIsDigit(str.substr(1, 3))
-        && (str[1] == '1'
-            || str[1] == '2'
-            || str[1] == '3'
-            || str[1] == '4'
-            || str[1] == '5'))
-    {
-        return 2;
-    }
-    return 3;
-}
-
-int    Parser::getErrorPageParserState(int prev, int pos)
-{
-    static int matrix[][4] = {
-        {EP_ERR, EP_COD, EP_ERR, EP_ERR}, // INI
-        {EP_ERR, EP_COD, EP_OVR, EP_URI}, // EP_COD
-        {EP_ERR, EP_ERR, EP_ERR, EP_URI}, // EP_OVR
-        {EP_ERR, EP_ERR, EP_ERR, EP_ERR}  // EP_URI
-    };
-    return matrix[prev][pos];
-}
-
-void    Parser::errorpageParser(std::vector<std::string>::iterator& it, Server& server)
-{
-    int                                 pos;
-    int                                 prev = 0;
-	std::vector<std::pair<int, int> >   ovr;
-
-    ++it;
-    while (*it != ";")
-    {
-        pos = getTypeOfItem(*it);
-        prev = getErrorPageParserState(prev, pos);
-        if (prev == 0)
-            throw std::runtime_error("Parser: configuration error");
 		if (prev == 1)
 			ovr.push_back(std::make_pair(std::atoi(it->c_str()), std::atoi(it->c_str())));
-        if (prev == 2)
-        {
-            for (size_t i = 0; i < ovr.size(); i++)
-			    ovr[i].second = std::atoi(it->substr(1, it->length()).c_str());
-        }
-        ++it;
-    }
-    if (getTypeOfItem(*(it - 1)) != 3)
-        throw std::runtime_error("Parser: configuration error");
+		if (prev == 2)
+		{
+			for (size_t i = 0; i < ovr.size(); i++)
+				ovr[i].second = std::atoi(it->substr(1, it->length()).c_str());
+		}
+		++it;
+	}
+	if (getTypeOfItem(*(it - 1)) != 3)
+		throw std::runtime_error("Parser: configuration error");
 	else
 		server.addErrorPage(ovr, *(it - 1));
 }
