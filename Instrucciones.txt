@@ -32,6 +32,9 @@ curl -v -X DELETE http://127.0.0.1:9999/delete-outside
 
 
 Pruebas del repo (automáticas)
+antes del test borrar antiguo 
+rm -f www/jfercode/upload/newfile_test.txt www/jfercode/upload/expect.txt www/jfercode/upload/bin.bin
+
 bash tests/post_tests.sh
 bash tests/chunked_test.sh
 bash tests/cgi_post_tests.sh

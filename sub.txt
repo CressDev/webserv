@@ -1,0 +1,66 @@
+Arranque: main lee la configuración y crea servidores/listeners. Ver: main.cpp.
+
+Bucle de eventos: el proceso entra en el loop de E/S que usa poll/select para listeners y clientes;
+ gestiona nuevas conexiones, lectura y escritura. Ver: event_loop.cpp.
+
+Cliente: cada conexión se representa por un Client (Client.hpp). 
+El ciclo de vida típico: aceptar socket → crear Client → leer cabecera → parsear → decidir acción (fichero, CGI, error) → generar respuesta → enviar → cerrar. Implementaciones en client.
+
+Parser de configuración: parsea default.conf y construye Server/LocationConfig. Ver: srcs/Parser.cpp y la carpeta parse.
+
+CGI: cuando procede, el servidor lanza proceso CGI con fork/execve, conecta pipes y hace I/O no bloqueante. Código en client_cgi.cpp.
+
+
+
+
+
+Código en client_cgi.cpp.
+Flujo detallado (paso a paso)
+
+Inicialización (main):
+
+Lee archivo de configuración → instancia Parser → obtiene vector de Server (puertos, roots, locations). (srcs/Parser.cpp)
+Crea ServerSocket por cada listen (bind+listen) y prepara estructuras pollfd. (ServerSocket.cpp)
+Entra en event_loop. (event_loop.cpp)
+
+
+Event loop :
+
+Llamada a poll() sobre listeners + clientes.
+Si hay evento en listener: aceptar (accept()), setNonBlocking, añadir Client a la lista y pollfd.
+Si hay evento de lectura en cliente: llamar a Client::chargeHeader() / Client::chargeBody() según estado. (client_parsing.cpp)
+Si hay evento de escritura en cliente: llamar a Client::flushResponse() para vaciar _sendBuffer. (client_response.cpp)
+Si hay evento en fds de CGI: Client::handleCgiFdEvent() para leer/escribir pipes; cuando el CGI termina, finalizeCgiIfDone() libera recursos. (client_cgi.cpp)
+
+
+Lectura y parseo de la petición (Client):
+
+chargeHeader() acumula bytes hasta \r\n\r\n. Cuando la cabecera está completa llama parseHeader(). (client_parsing.cpp)
+parseHeader() extrae método, URI, protocolo y cabeceras relevantes (Host, Content-Length, Transfer-Encoding, etc.). Usa helpers (urlDecode, strToLower). (client_helpers.cpp)
+setPath() / checkPathValidity() normalizan la ruta, aplican root, index, autoindex y deciden si es CGI o fichero estático. (client_path.cpp)
+Si método es POST y hay cuerpo: chargeBody() maneja lectura normal o chunked (chunkManagement()).
+
+
+Decisión de tratamiento:
+
+Static file: loadContent() lee archivo, sendResponse() construye cabeceras + cuerpo, pone todo en _sendBuffer. (client_response.cpp)
+Autoindex: generateDirectoryListing() crea HTML listado y se usa como cuerpo. (client_response.cpp)
+DELETE: handleDelete() intenta borrar y ajusta código de estado. (client_response.cpp)
+CGI: si la ruta coincide con una entry CGI, startCgiNonBlocking() crea pipes, fork() y execve() al intérprete; padre maneja I/O no bloqueante y lee salida para formar la respuesta. (client_cgi.cpp)
+
+
+Envío de respuesta y cierre:
+
+sendResponse() prepara _sendBuffer. El event loop notifica writable y flushResponse() hace send() repetido hasta vaciar buffer o EAGAIN. Si todo enviado, se marca isSent y puede cerrarse el socket según Connection. (client_response.cpp)
+En caso de error o finalización, se limpian recursos: cerrar fds, matar/esperar CGI si queda, liberar envp.
+
+
+Errores y prioridades:
+
+Validaciones de permisos/paths devuelven 403/404/500 según sea el caso (checkPathValidity, accesos).
+Límites (Content-Length, client_max_body_size) son comprobados y producen 413/411 cuando procede.
+Middleware de seguridad: isWithinRoot() evita traversal fuera de root. (client_helpers.cpp)
+Si quieres, te doy:
+
+
+

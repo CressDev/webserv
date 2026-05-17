@@ -197,12 +197,12 @@ static void handlePollOutEvent(size_t i, std::vector<struct pollfd>& pollfds, st
 }
 
 int runEventLoop(ServerSocket& sockman,
-					std::vector<Server>& servers,
-					std::vector<struct pollfd>& pollfds,
-					int sigfd,
-					std::vector<Client>& clients,
-					std::map<int, int>& cgiFdToClientIdx,
-					char** env)
+				std::vector<Server>& servers,
+				std::vector<struct pollfd>& pollfds,
+				int sigfd,
+				std::vector<Client>& clients,
+				std::map<int, int>& cgiFdToClientIdx,
+				char** env)
 {
 	bool stop = false;
 	while (!stop)
@@ -255,4 +255,4 @@ int runEventLoop(ServerSocket& sockman,
 		}
 	}
 	return 0;
-}
+	}

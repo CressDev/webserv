@@ -27,7 +27,7 @@ int main (int argc, char** argv, char** env)
 		std::vector<Server> servers;
 		Parser              parser(argv[1], servers);
 		(void)parser;
-
+		//PRINTEO DE LOS SERVER PARSEADOS
 		printParsedServers(servers);
 
 		ServerSocket sockman;
