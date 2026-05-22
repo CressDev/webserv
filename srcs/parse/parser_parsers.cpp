@@ -112,9 +112,9 @@ void	Parser::listenParser(std::vector<std::string>::iterator& it, Server& server
 		server.addListen(ip, port);
 	}
 	else
-	{    
-		bool    ip = false;
-		bool    port = false;
+	{
+		bool	ip = false;
+		bool	port = false;
 		std::string	ipPort;
 			
 		ip = check_ipv4(t);

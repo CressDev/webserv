@@ -8,11 +8,11 @@
 #include <map>
 
 int runEventLoop(ServerSocket& sockman,
-                 std::vector<Server>& servers,
-                 std::vector<struct pollfd>& pollfds,
-                 int sigfd,
-                 std::vector<Client>& clients,
-                 std::map<int, int>& cgiFdToClientIdx,
-                 char** env);
+				std::vector<Server>& servers,
+				std::vector<struct pollfd>& pollfds,
+				int sigfd,
+				std::vector<Client>& clients,
+				std::map<int, int>& cgiFdToClientIdx,
+				char** env);
 
 #endif // EVENT_LOOP_HPP

@@ -35,9 +35,9 @@ int	Parser::getErrorPageParserState(int prev, int pos)
 
 void	Parser::errorpageParser(std::vector<std::string>::iterator& it, Server& server)
 {
-	int                                 pos;
-	int                                 prev = 0;
-	std::vector<std::pair<int, int> >   ovr;
+	int									pos;
+	int									prev = 0;
+	std::vector<std::pair<int, int> >	ovr;
 
 	++it;
 	while (*it != ";")
